@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>three.js WIP</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">        
+    </head>
+    <body>
+        <div id="container"></div>
+
+        <script type="module">
+
+            import * as THREE from '/three.module.js';
+
+            var container;
+            var camera, scene, renderer;
+            var line;
+
+            setup();
+            update();
+
+            function setup() {
+
+                // SETUP CONTAINER, CAMERA, SCENE & RENDERER
+                container = document.getElementById('container');
+
+                camera = new THREE.PerspectiveCamera(2, window.innerWidth / window.innerHeight, 1, 4000);
+                camera.position.z = 2750;
+
+                scene = new THREE.Scene();
+
+                renderer = new THREE.WebGLRenderer();
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth / window.innerHeight);
+                renderer.outputEncoding = THREE.sRGBEncoding;
+
+                container.appendChild(renderer.domElement);
+
+                // SETUP GEOMETRY
+
+
+
+                // SETUP WINDOWS RESIZE LISTENER
+                window.addEventListener('resize', onWindowResize, false);
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            function update() {
+                requestAnimationFrame(update);
+                draw();
+            }
+
+            function draw() {
+
+                renderer.render(scene, camera);
+            }
+
+
+        </script>
+    </body>
+</html>

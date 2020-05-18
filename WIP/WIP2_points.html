@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>three.js WIP</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">        
+    </head>
+    <body>
+        <div id="container"></div>
+
+        <script type="module">
+
+            import * as THREE from '/three.module.js';
+			import { OrbitControls } from '/OrbitControls.js';
+
+            var container;
+            var camera, scene, renderer;
+            var points;
+            var positions = [];
+            var geometry;
+
+            setup();
+
+            function setup() {
+
+                // SETUP CONTAINER, CAMERA, SCENE
+                container = document.getElementById('container');
+
+                camera = new THREE.PerspectiveCamera(27, window.innerWidth / window.innerHeight, 1, 4000);
+                camera.position.x = 300;
+                camera.position.y = 300;
+                camera.position.z = -1000;
+
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x231709);
+                //scene.fog = new THREE.Fog(0xFFFFFF, 2500, 3500);
+
+                // SETUP GEOMETRY
+                geometry = new THREE.BufferGeometry();
+                var material = new THREE.PointsMaterial( { size: 3, vertexColors: true})
+
+                var colors = [];
+
+                console.log("batch: 4");
+
+                // ADD POINTS
+                var c = 0;
+                for ( var z = 0; z < 1000; z += 2) {
+                    for ( var x = 0; x < 1000; x += 2 ) {
+                        var y = 0; //Math.random() * 50 - 25;
+                        positions.push(x, y, z);
+                        c++;
+                        var r = x/500;
+                        var g = z/500;
+                        var b = 1.0;
+                        colors.push(r,g,b);
+                    }
+                }
+
+                console.log("total points: " +  c);
+                // SET POSITION AND COLOR TO GEOMETRY
+			
+                geometry.setAttribute( 'position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute( colors, 3));
+
+
+                geometry.computeBoundingSphere();
+
+                // SET GEOMETRY AND MATERIAL TO LINE OBJECT
+                points = new THREE.Points(geometry, material );
+                scene.add( points );
+
+                // SETUP RENDERER LAST TO VISUALIZE ABOVE CHANGES
+                renderer = new THREE.WebGLRenderer();
+                // OR TO PREVENT AUTO CLEAR DO THIS:
+                //renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true})
+                //renderer.autoClearColor = false;
+                
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth / window.innerHeight);
+                container.appendChild(renderer.domElement);
+
+
+				var controls = new OrbitControls( camera, renderer.domElement );
+
+
+                // SETUP WINDOWS RESIZE LISTENER
+                window.addEventListener('resize', onWindowResize, false);
+                document.addEventListener("keydown", onKeyDown, false);
+
+                onWindowResize();
+                update();
+            }
+
+            function onKeyDown(event) {
+                // W: 87  A: 65    S: 83   D:  68     Q: 81      E: 69
+                //console.log("key: " + event.which);
+                var step = 60;
+                switch ( event.which) {
+                    case 87: // UP
+                        camera.position.y += step;
+                        break;
+                    case 83: // DOWN
+                        camera.position.y -= step;
+                        break;
+                    case 65: // LEFT
+                        camera.position.x += step;
+                        break;
+                    case 68: // RIGHT
+                        camera.position.x -= step;
+                        break;
+                    case 81: // IN
+                        camera.position.z += step;
+                        break;
+                    case 69: // OUT
+                        camera.position.z -= step;
+                        break;
+                }
+                camera.lookAt(0,0,0);
+                console.log("position: " + camera.position.x +  ", " + camera.position.y + ", " + camera.position.z);
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            function update() {
+                requestAnimationFrame(update);
+
+
+                draw();
+            }
+
+            function draw() {
+
+
+                for ( var x = 1; x < positions.length; x += 3 ) {
+                    positions[x] += Math.random() - Math.random();
+                }
+                geometry.setAttribute( 'position', new THREE.Float32BufferAttribute(positions, 3));
+                //geometry.computeBoundingSphere();
+                //geometry.attributes.position.needsUpdate = true;
+
+                renderer.render(scene, camera);
+            }
+
+
+        </script>
+    </body>
+</html>

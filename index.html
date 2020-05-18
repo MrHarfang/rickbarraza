@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Gray Scott Sketch</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
+        <link href="./style.css?v=3" rel="stylesheet" type="text/css">
+        <script type="text/javascript" src="./libs/three.min.js"></script>
+    </head>
+    <body>
+        <div id="container">
+            <div id="canvasFrame">
+                <canvas id="mainCanvas"></canvas>
+                <div id="canvasOutput">
+                    <a href="javascript:cycleWorld(-1)"><</a>
+                    <span id="feedKillOutput">feed: 0.32 kill: 0.64</span>
+                    <a href="javascript:cycleWorld(1)">></a>
+                </div>
+            </div>
+            <div id="detailsFrame">
+                <div id="detailsTitle">Gray Scott Reaction Diffusion</div>
+                <div id="detailsBlurb">
+                    This sketch simulates a reaction diffusion system using the Gray Scott algorithm.
+                    Drawing with the cursor will <i>feed</i> the system while reacting to the kill ratio.
+                    (holding shift while drawing will kill the that spot).
+                    You can cycle through various feed/kill ratios above. Different settings produce patterns
+                    that are found in nature and organic chemical reactions. 
+                    This solution utilizes shader ping ponging for very performant computation on the GPU.
+                </div>
+                <button id="btnGithub" onclick="location.href='https://github.com/rickbarraza';"></button>
+            </div>
+            <div id="projectsFrame">
+                <input type="radio" checked />
+                <input type="radio" onclick="window.location='/sketch2.html';" />
+            </div>
+            <div id="footerFrame">
+                RICKBARRAZA.COM
+            </div>
+        </div>
+<!-- FIRST WE WILL ADD THE VERTEX SHADER AND BOTH FRAGMENT SHADERS -->
+<!-- THIS STANDARD VERTEX SHADER WILL BE USED FOR BOTH GPU RENDERINGS -->
+<script id="vertexShader" type='x-shader/x-vertex'>
+    varying vec2 vUV;
+
+    void main()
+    {
+        vUV = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+</script>
+<!-- THIS IS THE FRAGMENT SHADER THAT WILL CALCULATE THE 
+     GRAY SCOTT REACTIONS AND USER INTERACTIONS. 
+     THE AMOUNT OF REACTION IS STORED IN THE GREEN CHANNEL -->
+<script id="grayScottShader" type='x-shader/x-frag'>
+    varying vec2 vUV;
+    uniform sampler2D textureIn;
+    uniform float width;
+    uniform float height;
+    uniform float feed;
+    uniform float kill;
+    uniform vec2 cursor;
+    uniform float isAdding;
+
+    float xStep = 1.0/width;
+    float yStep = 1.0/height;
+
+    void main() {
+
+        // MOVE CURSOR TO THE FAR LEFT TO KILL ALL
+        if ( cursor.x < 0.01) {
+            gl_FragColor = vec4(1.0, 0, 0, 1.0);
+        }
+
+        // GET NEIGHBORING VALUES
+        float xBefore = vUV.x - xStep;
+        float xAfter = vUV.x + xStep;
+        float yBefore = vUV.y - yStep;
+        float yAfter = vUV.y + yStep;
+        xBefore = (xBefore < 0.0) ? xBefore + 1.0 : xBefore;
+        xAfter = (xAfter > 1.0) ? xAfter - 1.0 : xAfter;
+        yBefore = (yBefore < 0.0) ? yBefore + 1.0 : yBefore;
+        yAfter = (yAfter > 1.0) ? yAfter - 1.0 : yAfter;
+
+        // FORMS THE PATTERN:
+        //       uv2
+        //  uv0  uv  uv1
+        //       uv3
+        vec2 uv = texture2D(textureIn, vUV).rg;
+        vec2 uv0 = texture2D(textureIn, vec2(xBefore, vUV.y)).rg;
+        vec2 uv1 = texture2D(textureIn, vec2(xAfter, vUV.y)).rg;
+        vec2 uv2 = texture2D(textureIn, vec2(vUV.x, yBefore)).rg;
+        vec2 uv3 = texture2D(textureIn, vec2(vUV.x, yAfter)).rg;
+
+        // CALCULATE GRAY SCOTT
+        vec2 lap1 = (uv0 + uv1 + uv2 + uv3 - 4.0*uv);
+        float du = 0.2097 * lap1.r - uv.r*uv.g*uv.g + feed*(1.0 - uv.r);
+        float dv = 0.105  * lap1.g + uv.r*uv.g*uv.g - (feed+kill)*uv.g;
+        vec2 dst = uv + vec2(du, dv);
+
+        // FEED CELLS ON MOUSE MOVE
+        vec2 diff = (vUV - cursor)/vec2(xStep, yStep);
+        float dist = dot(diff, diff);
+        if (dist < 20.0) {
+            if ( isAdding == 1.0) {
+                if ( dist < 5.0) {
+                    dst.r = 0.0;
+                    dst.g = 0.9;        
+                }
+            } else {
+                dst.r = 1.0;
+                dst.g = 0.0;    
+            }
+        }
+
+        gl_FragColor = vec4(dst.r, dst.g, dst.g, 1.0);
+    }
+</script>
+<!-- THIS IS THE FINAL FRAGMENT SHADER USED BEFORE RENDERING.
+     IT TAKES THE GRAY SCOTT VALUE IN THE G CHANNEL AND MAPS IT
+     TO A CUSTOM COLOR RAMP SUPPLIED IN THE UNIFORM VALUES.
+     
+     NOTE: THE PING PONG PROCESS WILL MAKE SURE THAT THE
+     PREVIOUS FRAGMENT SHADER WILL CALCULATE GRAY SCOTT BEFORE
+     SENDING ITS OUTPUT INTO THIS SHADER AS 'textureIn' -->
+<script id="colorizingShader" type='x-shader/x-frag'>
+    varying vec2 vUV;
+    uniform sampler2D textureIn;
+
+    uniform vec4 color1;
+    uniform vec4 color2;
+    uniform vec4 color3;
+    uniform vec4 color4;
+    uniform vec4 color5;
+    uniform vec4 color6;
+
+    void legacy_main() {
+        // THE FOLLOWING PROCEDURE WAS THE FIRST SHADER
+        // ATTEMPTED SIMPLY TO VERIFY GRAY SCOTT WAS WORKING.
+        // IT GENERATES A DARK RED/GREEN OUTPUT IMAGE
+        vec4 value = texture2D(textureIn, vUV);
+        value.r = .2;
+        gl_FragColor = value;
+    }
+
+    void main() {
+        // THE FINAL PROCEDURE WE USE LEVERAGE THE COLOR RAMP
+        // WE ARE SENDING THROUGH THE UNIFORM VALUES AND 
+        // COLORIZES THE GRAY SCOTT RESULTS ALONG A GRADIENT
+        // FOR A GREATER DIVERSITY OF COLORS
+        float value = texture2D(textureIn, vUV).g;
+        float a;
+        vec3 col;
+        
+        if (value <= color1.a) {
+          col = color1.rgb;
+        } else if (value <= color2.a) {
+          a = (value - color1.a)/(color2.a - color1.a);
+          col = mix(color1.rgb, color2.rgb, a);
+        } else if (value <= color3.a) {
+          a = (value - color2.a)/(color3.a - color2.a);
+          col = mix(color2.rgb, color3.rgb, a);
+        } else if (value <= color4.a) {
+          a = (value - color3.a)/(color4.a - color3.a);
+          col = mix(color3.rgb, color4.rgb, a);
+        } else if (value <= color5.a) {
+          a = (value - color4.a)/(color5.a - color4.a);
+          col = mix(color4.rgb, color5.rgb, a);
+        } else if (value <= color6.a) {
+          a = (value - color5.a)/(color6.a - color5.a);
+          col = mix(color5.rgb, color6.rgb, a);
+        } else {
+          col = color6.rgb;
+        }
+        gl_FragColor = vec4(col.r, col.g, col.b, 1.0);
+    }
+</script>
+
+<script>
+
+    var canvas;
+    var width = 930.0;
+    var height = 600.0;
+    var mRenderer, mScene, mCamera;
+    var mUniforms;
+    var mTexture1, mTexture2;
+    var mGSMaterial, mScreenMaterial;
+    var mScreenQuad;
+    var mToggled = false;
+
+    var mMouseX, mMouseY;
+    var mMouseDown = false;
+
+    init = function() {
+        canvas = document.getElementById('mainCanvas');
+
+        canvas.onmousedown = onMouseDown;
+        canvas.onmousemove = onMouseMove;
+        canvas.onmouseup = onMouseUp;
+
+        mRenderer = new THREE.WebGLRenderer({ canvas: canvas, preserveDrawingBuffer: true });
+        mScene = new THREE.Scene();
+        mCamera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, -10000, 10000);
+        mCamera.position.z = 100;
+        mScene.add(mCamera);
+
+        mUniforms = {
+            width: {type: "f", value: undefined},
+            height: {type: "f", value: undefined},
+            textureIn: {type: "t", value: undefined},
+            feed: { type: "f", value: undefined},
+            kill: { type: "f", value: undefined},
+            cursor: {type: "v2", value: new THREE.Vector2(.5, .5)},
+            isAdding: { type: "f", value: 1.0 },
+            color1: { type: "v4", value: new THREE.Vector4(0x4C/255.0,  0x05/255.0,  0x05/255.0,  0.0245)},
+            color2: { type: "v4", value: new THREE.Vector4(0xAC/255.0,  0x00/255.0,  0xDD/255.0,  0.098)},
+            color3: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0xFF/255.0,  0x00/255.0,  0.2147)},
+            color4: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0xCC/255.0,  0xCC/255.0,  0.3067)},
+            color5: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0x00/255.0,  0xCC/255.0,  0.4172)},
+            color6: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0x00/255.0,  0x44/255.0,  1.0)},
+
+        };
+
+        mGSMaterial = new THREE.ShaderMaterial({
+            uniforms: mUniforms,
+            vertexShader: document.getElementById("vertexShader").textContent,
+            fragmentShader: document.getElementById("grayScottShader").textContent
+        });
+
+        mScreenMaterial = new THREE.ShaderMaterial({
+            uniforms: mUniforms,
+            vertexShader: document.getElementById("vertexShader").textContent,
+            fragmentShader: document.getElementById("colorizingShader").textContent
+        });
+
+
+        var plane = new THREE.PlaneGeometry(1.0, 1.0);
+        mScreenQuad = new THREE.Mesh(plane, mScreenMaterial);
+        mScene.add(mScreenQuad);
+
+        // TO GO IN A RESIZE FUNCTION...
+        mRenderer.setSize(width, height);
+        mUniforms.width.value = width/2;
+        mUniforms.height.value = height/2;
+        mUniforms.feed.value = 0.046; //0.082;
+        mUniforms.kill.value = 0.063; //0.06;
+
+        mTexture1 = new THREE.WebGLRenderTarget(width/2, height/2, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            type: THREE.FloatType });
+
+        mTexture2 = new THREE.WebGLRenderTarget(width/2, height/2, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            type: THREE.FloatType });
+
+        cycleWorld(0);
+        render(0);
+    }
+
+    var onMouseDown = function(e) {
+        var ev = e ? e : window.event;
+        mMouseX = ev.pageX - canvas.offsetLeft;
+        mMouseY = ev.pageY - canvas.offsetTop;
+        if ( mMouseX > width ) mMouseX = width;
+        if ( mMouseY > height ) mMouseY = height;
+        mUniforms.cursor.value = new THREE.Vector2(mMouseX/width, 1 - mMouseY/height);
+        mMouseDown = true;
+    }
+
+    var onMouseUp = function(e) {
+        mUniforms.cursor.value = new THREE.Vector2(-1,-1);
+        mMouseDown = false;
+    }
+
+    var onMouseMove = function(e) {
+        if (!mMouseDown) return;
+        var ev = e ? e : window.event;
+        if ( ev.shiftKey) {
+            mUniforms.isAdding.value = 0.0;
+        } else {
+            mUniforms.isAdding.value = 1.0;
+        }
+        mMouseX = ev.pageX - canvas.offsetLeft;
+        mMouseY = ev.pageY - canvas.offsetTop;
+        if ( mMouseX > width ) mMouseX = width;
+        if ( mMouseY > height ) mMouseY = height;
+        mUniforms.cursor.value = new THREE.Vector2(mMouseX/width, 1 - mMouseY/height);
+    }
+
+    var render = function(time) {
+
+        // THE SCREEN QUAD IS SET TO THE GS MATERIAL
+        mScreenQuad.material = mGSMaterial;
+
+        for ( var i = 0; i < 8; i++ ) {
+            // COMPUTE A GENERATION
+            if ( mToggled ) {
+                // SETUP THE CURRENT RENDER TEXTURE
+                mUniforms.textureIn.value = mTexture1;
+                // USING mTexture1 AS THE INPUT SOURCE
+                // USE THE SCENE AND CAMERA AND RENDER INTO mTexture2
+                mRenderer.render(mScene, mCamera, mTexture2, true);
+                // NOW SETUP THE TEXTURE YOU JUST CALCULATED AS THE NEXT INPUT
+                mUniforms.textureIn.value = mTexture2;
+            } else {
+                mUniforms.textureIn.value = mTexture2;
+                mRenderer.render(mScene, mCamera, mTexture1, true);
+                mUniforms.textureIn.value = mTexture1;
+            }
+            mToggled = !mToggled;
+        }
+
+        mScreenQuad.material = mScreenMaterial;
+        mRenderer.render(mScene, mCamera);
+        
+        // DO IT AGAIN
+        requestAnimationFrame(render);
+    }
+
+    var worldIndex = 0;
+    var worlds = [];
+
+    worlds[0] = {feed: 0.0460, kill: 0.0630 }    
+    worlds[1] = {feed: 0.0580, kill: 0.0650 }
+    worlds[2] = {feed: 0.0820, kill: 0.0590 }
+    worlds[3] = {feed: 0.0390, kill: 0.0580 }
+    worlds[4] = {feed: 0.0370, kill: 0.0600 }
+    worlds[5] = {feed: 0.0340, kill: 0.0618 }
+    worlds[6] = {feed: 0.0300, kill: 0.0630 }
+    worlds[7] = {feed: 0.0300, kill: 0.0565 }
+    worlds[8] = {feed: 0.0250, kill: 0.0600 }
+    worlds[9] = {feed: 0.0180, kill: 0.0510 }
+    worlds[10] = {feed: 0.0140, kill: 0.0450 }
+
+    function cycleWorld(offset) {
+        worldIndex += offset;
+        if (worldIndex < 0 ) worldIndex = worlds.length - 1;
+        if ( worldIndex >= worlds.length) worldIndex = 0;
+        var msg = `feed: ${(worlds[worldIndex].feed).toFixed(4)}  |  kill: ${(worlds[worldIndex].kill).toFixed(4)}`;
+        feedKillOutput.innerHTML = msg;
+        mUniforms.feed.value = worlds[worldIndex].feed;
+        mUniforms.kill.value = worlds[worldIndex].kill;
+    }
+
+    init();
+
+</script>
+</body>
+</html>

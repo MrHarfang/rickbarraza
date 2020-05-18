@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>feedback test</title>
+        <style>canvas { width: 100%; height: 100%; }</style>
+    </head>
+    <body>
+
+        <!-- no change vertex shader. Used for all render stages. -->
+        <script type="x-shader/x-vertex" id="vs_output">
+            
+            varying vec2 texCoord;
+
+            void main(void)
+            {
+                texCoord = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        </script>
+
+        <!-- feedback shader -->
+        <script id="fs_feedback" type="x-shader/x-fragment">
+        
+            // switch on high precision floats
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            uniform sampler2D texture;
+            uniform sampler2D texture2;
+            varying vec2 texCoord;
+            uniform float onOpen;
+
+            void main() 
+            {
+                // sample textures
+                vec4 result = texture2D(texture, texCoord);
+                vec4 startT = texture2D(texture2, texCoord);
+                result.rgb += 0.001;
+                result.rgb = mod(result.rgb, 1.0);
+                result.a = 1.0;
+                gl_FragColor = result;
+            }
+        
+        </script>
+
+        <!-- Final pass fragment shader -->
+        <script id="fs_output" type="x-shader/x-fragment">
+        
+            uniform sampler2D fb2output;
+            varying vec2 texCoord;
+
+            void main(void)
+            {
+                vec4 col = texture2D(fb2output, texCoord);
+                gl_FragColor = col;
+            }
+        </script>
+
+        <!-- init shader -->
+        <script id="fs_start" type="x-shader/x-fragment">
+        
+            uniform sampler2D texture;
+            varying vec2 texCoord;
+
+            void main(void) {
+                vec4 col = texture2D(texture, texCoord);
+                gl_FragColor = col;
+            }
+
+        </script>
+
+        <script type="module">
+
+            import * as THREE from '/three.module.js';
+
+            var cameraLoop, cameraOutput, sceneFeedback, sceneOutput, renderer, sceneStart;
+            var feedbackTexture, feedbackTexture2, loadTexture;
+            var feedbackUniforms, mainUniforms, startUniforms;
+            var feedbackQuad, sceneQuad, startQuad;
+            var feedbackMat, screenMat, startMat;
+            var loopRes = new THREE.Vector2(64.0, 64.0);
+            var outputRes = new THREE.Vector2(512.0, 512.0);
+
+            var doLoad = 0.0;
+            var onOpen = 0.0;
+
+            var renderTargetNearestFloatParams = {
+                minFilter:THREE.NearestFilter,
+                magFilter:THREE.NearestFilter,
+                wrapS:THREE.ClampToEdgeWrapping,
+                wrapT:THREE.ClampToEdgeWrapping,
+                format:THREE.RGBAFormat,
+                stencilBuffer:false,
+                depthBuffer:false,
+                needsUpdate:true,
+                type:THREE.FloatType
+            };
+
+            start();
+
+            function start() {
+
+                // setup scenes
+                sceneOutput = new THREE.Scene();
+                sceneFeedback = new THREE.Scene();
+                sceneStart = new THREE.Scene();
+
+                // setup renderer
+                renderer = new THREE.WebGLRenderer( {precision: "highp"});
+                renderer.setSize( window.innerWidth, window.innerHeight);
+                renderer.setClearColor(0x808080);
+                renderer.autoClear = false;
+                document.body.appendChild(renderer.domElement);
+
+                // create buffers
+                feedbackTexture = new THREE.WebGLRenderTarget( loopRes.x, loopRes.y, renderTargetNearestFloatParams);
+                feedbackTexture2 = new THREE.WebGLRenderTarget( loopRes.x, loopRes.y, renderTargetNearestFloatParams);
+
+                // load a texture, set wrap mode
+                var loadTexture = THREE.ImageUtils.loadTexture( "me.jpeg", undefined, update);
+                loadTexture.wrapS = THREE.ClampToEdgeWrapping;
+                loadTexture.wrapT = THREE.ClampToEdgeWrapping;
+                loadTexture.minFilter = THREE.NearestFilter;
+                loadTexture.magFilter = THREE.NearestFilter;
+                loadTexture.format = THREE.RGBAFormat;
+                loadTexture.type = THREE.FloatType;
+
+                // SETUP algorithm camera
+                cameraLoop = new THREE.OrthographicCamera(loopRes.x / -2, loopRes.x/2, loopRes.y/2, loopRes.y/-2, -10000, 10000 );
+
+                // SETUP sceneOutput camera
+                cameraOutput = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 10000);
+                cameraOutput.position.z = 300;
+
+                // feedback shader
+                feedbackUniforms = {
+                    texture: { type: "t", value: feedbackTexture2},
+                    texture2: { type: "t", value: loadTexture},
+                    onOpen: { type: "f", value: 0.0},
+                };
+
+                feedbackMat = new THREE.ShaderMaterial( {
+                    uniforms: feedbackUniforms,
+                    vertexShader: document.getElementById('vs_output').textContent,
+                    fragmentShader: document.getElementById('fs_feedback').textContent
+                });
+
+                var feedbackGeo = new THREE.PlaneBufferGeometry( loopRes.x, loopRes.y );
+                feedbackQuad = new THREE.Mesh( feedbackGeo, feedbackMat);
+                feedbackQuad.position.z = -100;
+                sceneFeedback.add(feedbackQuad);
+
+                // output shader
+                mainUniforms = {
+                    fb2output: { type: "t", value: feedbackTexture2},
+                };
+
+                screenMat = new THREE.ShaderMaterial( {
+                    uniforms: mainUniforms,
+                    vertexShader: document.getElementById('vs_output').textContent,
+                    fragmentShader: document.getElementById('fs_output').textContent,
+                });
+                var screenGeo = new THREE.PlaneBufferGeometry( outputRes.x, outputRes.y);
+                sceneQuad = new THREE.Mesh(screenGeo, screenMat);
+                sceneQuad.position.z = -200;
+                sceneOutput.add(sceneQuad);
+
+                startUniforms = {
+                    texture: { type: "t", value: loadTexture},
+                };
+
+                startMat = new THREE.ShaderMaterial( {
+                    uniforms: startUniforms,
+                    vertexShader: document.getElementById('vs_output').textContent,
+                    fragmentShader: document.getElementById('fs_start').textContent,
+                });
+
+                var startGeo = new THREE.PlaneBufferGeometry( loopRes.x, loopRes.y);
+                startQuad = new THREE.Mesh( startGeo, startMat);
+                startQuad.position.z = -100;
+                sceneStart.add(startQuad);
+            }
+
+            var foo = 0;
+
+            function update() {
+                requestAnimationFrame(update);
+                console.log(foo);
+                if ( foo < 2) {
+                    render();
+                    foo++;
+                }
+            }
+
+            function render() {
+                renderer.clear();
+                if (doLoad < 1.0) {
+                    renderer.render(sceneStart, cameraLoop, feedbackTexture2);
+                    doLoad = 1.0;
+                } else {
+                    renderer.render(sceneFeedback, cameraLoop, feedbackTexture);
+
+                    var a = feedbackTexture2;
+                    feedbackTexture2 = feedbackTexture;
+                    feedbackTexture = a;
+                    feedbackUniforms.texture.value = feedbackTexture2;
+                }
+                renderer.render( sceneOutput, cameraOutput);
+            }
+
+        </script>
+
+
+    </body>
+</html>

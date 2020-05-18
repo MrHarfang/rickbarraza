@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>feedback test</title>
+        <style>
+            html, body { width: 100%; height: 100%; background: #000; }
+            body { margin: 0; overflow: hidden; }
+            canvas { width: 100%; height: 100%; }
+        </style>
+    </head>
+    <body>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/101/three.min.js"></script>
+        <script src="https://threejs.org/examples/js/controls/TrackballControls.js"></script>
+        
+<!-- The simulation shaders update positional attributes -->
+<script id='sim-vs' type='x-shader/x-vert'>
+    precision mediump float;
+  
+    uniform mat4 projectionMatrix;
+    uniform mat4 modelViewMatrix;
+  
+    attribute vec2 uv; // x,y offsets of each point in texture
+    attribute vec3 position;
+  
+    varying vec2 vUv;
+  
+    void main() {
+      vUv = vec2(uv.x, 1.0 - uv.y);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  </script>
+  
+  <script id='sim-fs' type='x-shader/x-frag'>
+    precision mediump float;
+  
+    uniform sampler2D posTex;
+  
+    varying vec2 vUv;
+  
+    void main() {
+  
+      // read the supplied x,y,z vert positions
+      vec3 pos = texture2D(posTex, vUv).xyz;
+  
+      // update the positional attributes here!
+      pos.x += cos(pos.y) / 100.0;
+      pos.y += tan(pos.x) / 100.0;
+  
+      // render the new positional attributes
+      gl_FragColor = vec4(pos, 1.0);
+    }
+  </script>
+  
+  <!-- The ui shaders render what the user sees -->
+  <script id='ui-vert' type='x-shader/x-vert'>
+    precision mediump float;
+  
+    uniform sampler2D posMap; // contains positional data read from sim-fs
+    uniform mat4 projectionMatrix;
+    uniform mat4 modelViewMatrix;
+  
+    attribute vec2 position;
+  
+    void main() {
+  
+      // read this particle's position, which is stored as a pixel color
+      vec3 pos = texture2D(posMap, position.xy).xyz;
+  
+      // project this particle
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+  
+      // set the size of each particle
+      gl_PointSize = 0.3 / -mvPosition.z;
+    }
+  
+  </script>
+  
+  <script id='ui-frag' type='x-shader/x-frag'>
+    precision mediump float;
+  
+    void main() {
+      gl_FragColor = vec4(0.0, 0.5, 1.5, 1.0);
+    }
+  </script>
+
+  <script>
+// specify the container where we'll render the scene
+var elem = document.querySelector('body'),
+    elemW = elem.clientWidth,
+    elemH = elem.clientHeight
+
+// generate a scene object
+var scene = new THREE.Scene();
+
+// generate a camera
+var camera = new THREE.PerspectiveCamera(75, elemW/elemH, 0.001, 100);
+
+// generate a renderer
+var renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(elemW, elemH);
+elem.appendChild(renderer.domElement);
+
+// generate controls
+var controls = new THREE.TrackballControls(camera, renderer.domElement);
+
+// position camera and controls
+camera.position.set(0.5, 0.5, -5);
+controls.target = new THREE.Vector3(0.5, 0.5, 0);
+
+/**
+* FBO
+**/
+
+// verify browser agent supports "frame buffer object" features
+gl = renderer.getContext();
+if (!gl.getExtension('OES_texture_float') ||
+     gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) == 0) {
+  alert(' * Cannot create FBO :(');
+}
+
+// set initial positions of `w*h` particles
+var w = h = 256,
+    i = 0,
+    data = new Float32Array(w*h*3);
+for (var x=0; x<w; x++) {
+  for (var y=0; y<h; y++) {
+    data[i++] = x/w;
+    data[i++] = y/h;
+    data[i++] = 0;
+  }
+}
+
+// feed those positions into a data texture
+var dataTex = new THREE.DataTexture(data, w, h, THREE.RGBFormat, THREE.FloatType);
+dataTex.minFilter = THREE.NearestFilter;
+dataTex.magFilter = THREE.NearestFilter;
+dataTex.needsUpdate = true;
+
+// add the data texture with positions to a material for the simulation
+var simMaterial = new THREE.RawShaderMaterial({
+  uniforms: { posTex: { type: 't', value: dataTex }, },
+  vertexShader: document.querySelector('#sim-vs').textContent,
+  fragmentShader: document.querySelector('#sim-fs').textContent,
+});
+
+// delete dataTex; it isn't used after initializing point positions
+delete dataTex;
+
+THREE.FBO = function(w, simMat) {
+  this.scene = new THREE.Scene();
+  this.camera = new THREE.OrthographicCamera(-w/2, w/2, w/2, -w/2, -1, 1);
+  this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(w, w), simMat));
+};
+
+// create a scene where we'll render the positional attributes
+var fbo = new THREE.FBO(w, simMaterial);
+
+// create render targets a + b to which the simulation will be rendered
+var renderTargetA = new THREE.WebGLRenderTarget(w, h, {
+  wrapS: THREE.RepeatWrapping,
+  wrapT: THREE.RepeatWrapping,
+  minFilter: THREE.NearestFilter,
+  magFilter: THREE.NearestFilter,
+  format: THREE.RGBFormat,
+  type: THREE.FloatType,
+  stencilBuffer: false,
+});
+
+// a second render target lets us store input + output positional states
+renderTargetB = renderTargetA.clone();
+
+// render the positions to the render targets
+renderer.render(fbo.scene, fbo.camera, renderTargetA, false);
+renderer.render(fbo.scene, fbo.camera, renderTargetB, false);
+
+// store the uv attrs; each is x,y and identifies a given point's
+// position data within the positional texture; must be scaled 0:1!
+var geo = new THREE.BufferGeometry(),
+    arr = new Float32Array(w*h*3);
+for (var i=0; i<arr.length; i++) {
+  arr[i++] = (i%w)/w;
+  arr[i++] = Math.floor(i/w)/h;
+  arr[i++] = 0;
+}
+geo.addAttribute('position', new THREE.BufferAttribute(arr, 3, true))
+
+// create material the user sees
+var material = new THREE.RawShaderMaterial({
+  uniforms: {
+    posMap: { type: 't', value: null }, // `posMap` is set each render
+  },
+  vertexShader: document.querySelector('#ui-vert').textContent,
+  fragmentShader: document.querySelector('#ui-frag').textContent,
+  transparent: true,
+});
+
+// add the points the user sees to the scene
+var mesh = new THREE.Points(geo, material);
+scene.add(mesh);
+
+function render() {
+  // at the start of the render block, A is one frame behind B
+  var oldA = renderTargetA; // store A, the penultimate state
+  renderTargetA = renderTargetB; // advance A to the updated state
+  renderTargetB = oldA; // set B to the penultimate state
+
+  // pass the updated positional values to the simulation
+  simMaterial.uniforms.posTex.value = renderTargetA.texture;
+
+  // run a frame and store the new positional values in renderTargetB
+  renderer.render(fbo.scene, fbo.camera, renderTargetB, false);
+
+  // pass the new positional values to the scene users see
+  material.uniforms.posMap.value = renderTargetB.texture;
+
+  // render the scene users see as normal
+  renderer.render(scene, camera);
+  controls.update();
+  requestAnimationFrame(render);
+};
+
+render();
+
+
+
+  </script>
+
+
+    </body>
+</html>

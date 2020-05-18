@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>three.js WIP</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">        
+    </head>
+    <body>
+        <div id="container"></div>
+
+        <script type="module">
+
+            import * as THREE from '/three.module.js';
+
+            var container;
+
+            var cameraOrtho;
+            var sceneOrtho;
+            var renderer;
+
+            var spriteTL;
+
+            setup();
+            update();
+
+            function setup() {
+
+                // SETUP CONTAINER, CAMERA, SCENE & RENDERER
+                container = document.getElementById('container');
+
+                var width = window.innerWidth;
+                var height = window.innerHeight;
+
+                cameraOrtho = new THREE.OrthographicCamera(-width/2, width/2, height/2, -height/2, 1, 10);
+                cameraOrtho.position.z = 10;
+                
+                sceneOrtho = new THREE.Scene();
+
+                var textureLoader = new THREE.TextureLoader();
+
+                textureLoader.load("sprites/sprite0.png", createHUDSprites)
+
+
+
+
+
+                renderer = new THREE.WebGLRenderer();
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth / window.innerHeight);
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                renderer.autoClear = false; // To allow render overlay of top sprited sphere
+
+                container.appendChild(renderer.domElement);
+
+                // SETUP GEOMETRY
+
+
+
+                // SETUP WINDOWS RESIZE LISTENER
+                window.addEventListener('resize', onWindowResize, false);
+            }
+
+            function createHUDSprites(texture) {
+
+                var material = new THREE.SpriteMaterial({map: texture})
+
+                var width = material.map.image.width;
+                var height = material.map.image.height;
+
+                spriteTL = new THREE.Sprite( material );
+                spriteTL.center.set(0.0, 1.0);
+                spriteTL.scale.set(width, height, 1);
+                sceneOrtho.add(spriteTL);
+                updateHUDSprites();
+
+            }
+
+            function updateHUDSprites() {
+                var width = window.innerWidth / 2;
+                var height = window.innerHeight / 2;
+                spriteTL.position.set(-width, height, 1);
+            }
+
+
+            function onWindowResize() {
+                var width = window.innerWidth;
+				var height = window.innerHeight;
+
+				cameraOrtho.left = - width / 2;
+				cameraOrtho.right = width / 2;
+				cameraOrtho.top = height / 2;
+				cameraOrtho.bottom = - height / 2;
+				cameraOrtho.updateProjectionMatrix();
+
+				updateHUDSprites();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+            }
+
+            function update() {
+                requestAnimationFrame(update);
+                draw();
+            }
+
+            function draw() {
+
+                renderer.render(sceneOrtho, cameraOrtho);
+            }
+
+
+        </script>
+    </body>
+</html>

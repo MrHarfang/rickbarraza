@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>feedback test</title>
+        <style>
+            html, body { width: 100%; height: 100%; background: #446; }
+            body { margin: 0; overflow: hidden; }
+            canvas { width: 100%; height: 100%; }
+        </style>
+        <script type="text/javascript" src="three.min.js"></script>
+
+        <!-- the common vertex shader for both materials -->
+        <script id="standardVertexShader" type="x-shader/x-vertex">
+            varying vec2 vUv;
+            
+            void main()
+            {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        </script>
+
+        <!-- the first fragment shader. Returns Red -->
+        <script id='gsFragmentShader' type='x-shader/x-frag'>
+            varying vec2 vUv;
+            uniform sampler2D tSource;
+            uniform float screenWidth;
+            uniform float screenHeight;
+            uniform float feed;
+            uniform float kill;
+            uniform vec2 brush;
+
+            float step_x = 1.0/screenWidth;
+            float step_y = 1.0/screenHeight;
+            vec2 texel = vec2(step_x, step_y);
+
+            void main() {
+
+                vec4 value = texture2D(tSource, vUv);
+
+                vec2 diff = (vUv - brush)/texel;
+                float dist = dot(diff, diff);
+                if (dist < 5.0) {
+                    value.g = 1.0;
+                }
+
+                value.rgb *= .99;
+                gl_FragColor = value;
+
+            }
+        </script>
+
+        <!-- the first fragment shader. Returns Blue -->
+        <script id='screenFragShader' type='x-shader/x-frag'>
+            varying vec2 vUv;
+            uniform sampler2D tSource;
+            uniform float screenWidth;
+            uniform float screenHeight;
+            uniform float feed;
+            uniform float kill;
+
+            void main() {
+                vec4 value = texture2D(tSource, vUv);
+                float g = value.g;
+                value.g = value.b;
+                value.b = g;
+                gl_FragColor = value;
+            }
+        </script>
+    </head>
+    <body>
+        <canvas id="myCanvas" style="width:720px;height:480px"></canvas>
+
+        <script>
+
+            var canvas;
+            var canvasWidth, canvasHeight;
+            var mRenderer, mScene, mCamera;
+            var mUniforms;
+            var mTexture1, mTexture2;
+            var mGSMaterial, mScreenMaterial;
+            var mScreenQuad;
+            var mToggled = false;
+
+            var mMouseX, mMouseY;
+            var mMouseDown = false;
+
+            init = function() {
+                canvas = document.getElementById('myCanvas');
+
+                canvas.onmousemove = onMouseMove;
+
+                mRenderer = new THREE.WebGLRenderer({ canvas: canvas, preserveDrawingBuffer: true });
+                mScene = new THREE.Scene();
+                mCamera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, -10000, 10000);
+                mCamera.position.z = 100;
+                mScene.add(mCamera);
+
+                mUniforms = {
+                    screenWidth: {type: "f", value: undefined},
+                    screenHeight: {type: "f", value: undefined},
+                    tSource: {type: "t", value: undefined},
+                    feed: { type: "f", value: 0.8},
+                    kill: { type: "f", value: 0.1 },
+                    brush: {type: "v2", value: new THREE.Vector2(.5, .5)},
+                };
+
+                mGSMaterial = new THREE.ShaderMaterial({
+                    uniforms: mUniforms,
+                    vertexShader: document.getElementById("standardVertexShader").textContent,
+                    fragmentShader: document.getElementById("gsFragmentShader").textContent
+                });
+
+                mScreenMaterial = new THREE.ShaderMaterial({
+                    uniforms: mUniforms,
+                    vertexShader: document.getElementById("standardVertexShader").textContent,
+                    fragmentShader: document.getElementById("screenFragShader").textContent
+                });
+
+
+                var plane = new THREE.PlaneGeometry(1.0, 1.0);
+                mScreenQuad = new THREE.Mesh(plane, mScreenMaterial);
+                mScene.add(mScreenQuad);
+
+                // TO GO IN A RESIZE FUNCTION...
+                mRenderer.setSize(720, 480);
+                mUniforms.screenWidth.value = 720/2;
+                mUniforms.screenHeight.value = 480/2;
+
+                mTexture1 = new THREE.WebGLRenderTarget(720/2, 480/2, {
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter,
+                    format: THREE.RGBAFormat,
+                    type: THREE.FloatType });
+
+                mTexture2 = new THREE.WebGLRenderTarget(720/2, 480/2, {
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter,
+                    format: THREE.RGBAFormat,
+                    type: THREE.FloatType });
+
+
+                render(0);
+            }
+
+            var count = 0;
+
+            var onMouseMove = function(e) {
+                var ev = e ? e : window.event;
+                mMouseX = ev.pageX;
+                mMouseY = ev.pageY;
+                if ( mMouseX > 720 ) mMouseX = 720;
+                if ( mMouseY > 480 ) mMouseY = 480;
+                mUniforms.brush.value = new THREE.Vector2(mMouseX/720.0, 1 - mMouseY/480.0);
+            }
+
+            var render = function(time) {
+
+                // THE SCREEN QUAD IS SET TO THE GS MATERIAL
+                mScreenQuad.material = mGSMaterial;
+
+                count += 0.1;
+                var feed = Math.sin(count)*.5 + 0.5;
+                // UPDATE THE FEED AND KILL GLOBAL VALUES
+                mUniforms.feed.value = feed;
+                mUniforms.kill.value = feed;
+
+                // COMPUTE A GENERATION
+                if ( mToggled ) {
+                    // SETUP THE CURRENT RENDER TEXTURE
+                    mUniforms.tSource.value = mTexture1;
+                    // USING mTexture1 AS THE INPUT SOURCE
+                    // USE THE SCENE AND CAMERA AND RENDER INTO mTexture2
+                    mRenderer.render(mScene, mCamera, mTexture2, true);
+                    // NOW SETUP THE TEXTURE YOU JUST CALCULATED AS THE NEXT INPUT
+                    mUniforms.tSource.value = mTexture2;
+                } else {
+                    mUniforms.tSource.value = mTexture2;
+                    mRenderer.render(mScene, mCamera, mTexture1, true);
+                    mUniforms.tSource.value = mTexture1;
+                }
+                mToggled = !mToggled;
+
+                mScreenQuad.material = mScreenMaterial;
+                //mScreenQuad.material = mGSMaterial;
+                mRenderer.render(mScene, mCamera);
+                
+                // DO IT AGAIN
+                requestAnimationFrame(render);
+            }
+
+
+            var render_simple = function(time) {
+
+                if ( mToggled ) {
+                    mScreenQuad.material = mGSMaterial;
+
+                } else {
+                    mScreenQuad.material = mScreenMaterial;
+                }
+                mToggled = !mToggled;
+
+                mRenderer.render(mScene, mCamera);
+  
+                requestAnimationFrame(render_simple);
+            }
+
+            init();
+
+        </script>
+
+    </body>
+</html>

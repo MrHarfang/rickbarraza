@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>three.js WIP</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">        
+    </head>
+    <body>
+        <div id="container"></div>
+
+        <script type="module">
+
+            import * as THREE from '/three.module.js';
+
+            var container;
+            var camera, scene, renderer;
+            var line;
+
+            setup();
+            update();
+
+            function setup() {
+
+                // SETUP CONTAINER, CAMERA, SCENE
+                container = document.getElementById('container');
+
+                camera = new THREE.PerspectiveCamera(27, window.innerWidth / window.innerHeight, 1, 4000);
+                camera.position.z = 2000;
+
+                scene = new THREE.Scene();
+
+
+                // SETUP GEOMETRY
+                var geometry = new THREE.BufferGeometry();
+                var material = new THREE.LineBasicMaterial( { vertexColors: true});
+
+                var positions = [];
+                var colors = [];
+
+                console.log("batch: 4");
+
+                // ADD LINES
+
+                positions.push(-500, 0, 0,     500,0,0);
+                colors.push(1,.5,0,           1,0,0);
+                
+                positions.push(0, -500, 0,     0,500,0);
+                colors.push(.5,1,0,           0,1,0);
+
+                positions.push(0,0,-500,     0,0,500);
+                colors.push(.5,0,1,  0, 0, 1);
+
+                // SET POSITION AND COLOR TO GEOMETRY
+                geometry.setAttribute( 'position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute( colors, 3));
+
+
+                geometry.computeBoundingSphere();
+
+                // SET GEOMETRY AND MATERIAL TO LINE OBJECT
+                line = new THREE.LineSegments(geometry, material );
+                scene.add( line );
+
+                // SETUP RENDERER LAST TO VISUALIZE ABOVE CHANGES
+                renderer = new THREE.WebGLRenderer();
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth / window.innerHeight);
+                renderer.outputEncoding = THREE.sRGBEncoding;
+
+                container.appendChild(renderer.domElement);
+
+                // SETUP WINDOWS RESIZE LISTENER
+                window.addEventListener('resize', onWindowResize, false);
+                document.addEventListener("keydown", onKeyDown, false);
+                onWindowResize();
+            }
+
+            function onKeyDown(event) {
+                // W: 87  A: 65    S: 83   D:  68     Q: 81      E: 69
+                //console.log("key: " + event.which);
+                var step = 60;
+                switch ( event.which) {
+                    case 87: // UP
+                        camera.position.y += step;
+                        break;
+                    case 83: // DOWN
+                        camera.position.y -= step;
+                        break;
+                    case 65: // LEFT
+                        camera.position.x += step;
+                        break;
+                    case 68: // RIGHT
+                        camera.position.x -= step;
+                        break;
+                    case 81: // IN
+                        camera.position.z += step;
+                        break;
+                    case 69: // OUT
+                        camera.position.z -= step;
+                        break;
+                }
+                camera.lookAt(0,0,0);
+                console.log("position: " + camera.position.x +  ", " + camera.position.y + ", " + camera.position.z);
+            }
+
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            function update() {
+                requestAnimationFrame(update);
+                draw();
+            }
+
+            function draw() {
+
+                renderer.render(scene, camera);
+            }
+
+
+        </script>
+    </body>
+</html>
