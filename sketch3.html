@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Mycellium Growth</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
+        <link href="./style.css?v=3" rel="stylesheet" type="text/css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/p5.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/addons/p5.dom.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/addons/p5.sound.min.js"></script>
+    
+    </head>
+    <body>
+        <div id="container">
+            <div id="canvasFrame">
+                <div id="mainCanvas"></div>
+                <div id="canvasOutput">
+                    ...
+                </div>
+            </div>
+            <div id="detailsFrame">
+                <div id="detailsTitle">Mycillium Growth Patterns</div>
+                <div id="detailsBlurb">
+                    Using P5.JS to explore mycillium growth patterns.
+                    
+                </div>
+                <button id="btnGithub" onclick="location.href='https://github.com/rickbarraza';"></button>
+            </div>
+            <div id="projectsFrame">
+                <input type="radio" onclick="window.location='/index.html';" />
+                <input type="radio" onclick="window.location='/sketch2.html';" />
+                <input type="radio" checked/>
+            </div>
+            <div id="footerFrame">
+                RICKBARRAZA.COM
+            </div>
+        </div>
+<script>
+
+let sketch = function(p) {
+
+
+    var heads = [];
+
+    class Head {
+        constructor(_x, _y, _size, _life) {
+            this.x = _x;
+            this.y = _y;
+            this.dx = 3 * (Math.random() - Math.random());
+            this.dy = 3 * (Math.random() - Math.random());
+            this.size = _size;
+            this.life = _life;
+        }
+    }
+        
+    p.setup = function() {
+        for ( var i = 0; i < 3; i++ ) {
+            var temp = new Head(.5*930, .5*600, 10 + Math.random()*10, 60 + Math.random() * 40);
+            heads.push(temp);
+        }
+        with (p) {
+            createCanvas(930, 600);
+            stroke(255, 100);
+        }
+    };
+
+    p.mousePressed = function() {
+        var temp = new Head(p.mouseX, p.mouseY, 10 + Math.random()*10, 60 + Math.random() * 40);
+        heads.push(temp);
+    }
+
+    function checkLife(head) {
+        return head.life > 0;
+    }
+
+    p.draw = function() {
+        with (p) {
+            //p.background(0,0,0,1);
+            var newHeads = [];
+
+            for ( var i = 0; i < heads.length; i++ ) {
+
+                var temp = heads[i];
+
+                // DO WE NEED A SPAWN?
+                if ( Math.random() < .02 && heads.length < 500 && temp.life > 10) {
+                    var spawn = new Head(temp.x, temp.y, 
+                                        temp.size * (temp.life / 100.0), 
+                                        temp.life); 
+                    newHeads.push(spawn);
+                }
+
+                temp.x = temp.x < 0 ? 0 : temp.x;
+                temp.x = temp.x > 930 ? 930 : temp.x;
+                temp.y = temp.y < 0 ? 0 : temp.y;
+                temp.y = temp.y > 600 ? 600 : temp.y;
+                temp.life -= .25;
+                var size = temp.size * (temp.life / 100.0)
+                ellipse(temp.x, temp.y, size, size);
+                temp.x += temp.dx;
+                temp.y += temp.dy;
+                temp.dx += .5*(random() - random());
+                temp.dy += .5*(random() - random());
+                temp.dx *= .98;
+                temp.dy *= .98;
+            }
+
+            heads = heads.filter(checkLife);
+            for ( var i =0; i < newHeads.length; i++ ) {
+                heads.push(newHeads[i]);
+            }
+            newHeads = [];
+            if ( heads.length > 0 ) {
+                console.log(heads.length);
+            }
+        }
+    };
+
+    function segment(x, y, a) {
+        p.push();
+        p.translate(x, y);
+        p.rotate(a);
+        p.line(0, 0, segLength, 0);
+        p.pop();
+    }
+};
+
+new p5(sketch, 'mainCanvas');
+
+</script>
+</body>
+</html>
