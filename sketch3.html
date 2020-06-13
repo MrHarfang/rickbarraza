@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>Mycellium Growth</title>
+        <title>Mycelial Portraits</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
         <link href="./style.css?v=3" rel="stylesheet" type="text/css">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/p5.min.js"></script>
@@ -15,21 +15,28 @@
             <div id="canvasFrame">
                 <div id="mainCanvas"></div>
                 <div id="canvasOutput">
-                    ...
+                    <a href="javascript:p5sketch.cycleImage(-1)"><</a>
+                    <span id="innerOutput">cycle images</span>
+                    <a href="javascript:p5sketch.cycleImage(1)">></a>
                 </div>
             </div>
             <div id="detailsFrame">
-                <div id="detailsTitle">Mycillium Growth Patterns</div>
+                <div id="detailsTitle">Mycelial Portraits</div>
                 <div id="detailsBlurb">
-                    Using P5.JS to explore mycillium growth patterns.
+                    Using the algorithm from the Mycelial Growth Study, I use a greyscale image to 
+                    represent the soil and simulate fungal networks blooming. The fungal hyphae feed
+                    on the brightest spots of image which also stimulate growth. Dark patches weaken
+                    the growth. Over time, the source image becomes visible in the growth network. 
+                    Made with P5.JS
                     
                 </div>
                 <button id="btnGithub" onclick="location.href='https://github.com/rickbarraza';"></button>
             </div>
             <div id="projectsFrame">
-                <input type="radio" onclick="window.location='/index.html';" />
-                <input type="radio" onclick="window.location='/sketch2.html';" />
-                <input type="radio" checked/>
+                <input type="radio" onclick="window.location='/index.html';" title="Gray-Scott Reactions"/>
+                <input type="radio" onclick="window.location='/sketch2.html';"title="Study: Mycelial Growth" />
+                <input type="radio" checked title="Mycelial Portraits"/>
+                
             </div>
             <div id="footerFrame">
                 RICKBARRAZA.COM
@@ -46,28 +53,63 @@ let sketch = function(p) {
         constructor(_x, _y, _size, _life) {
             this.x = _x;
             this.y = _y;
-            this.dx = 3 * (Math.random() - Math.random());
-            this.dy = 3 * (Math.random() - Math.random());
+            this.dx = 2 * (Math.random() - Math.random());
+            this.dy = 2 * (Math.random() - Math.random());
             this.size = _size;
             this.life = _life;
         }
     }
         
-    p.setup = function() {
-        for ( var i = 0; i < 3; i++ ) {
-            var temp = new Head(.5*930, .5*600, 10 + Math.random()*10, 60 + Math.random() * 40);
-            heads.push(temp);
+    let img;
+    let imgs =[];
+    var imgIndex = 0;
+    var totalImages = 5;
+
+    p.preload = function() {
+
+        for (var i=0; i<totalImages; i++) {
+            imgs[i] = p.loadImage("images/bkg"+i+".png"); 
         }
+    }
+
+    p.setup = function() {
         with (p) {
             createCanvas(930, 600);
-            stroke(255, 100);
+            cycleImage(0);
+            noStroke();
+            //let d = pixelDensity(); // returns 2 on the mac
+            //console.log("density: " + d);
+            //console.log(pixels.length);
+            //console.log(4 * (930 * 2 * 600 * 2));
+
+            for ( var x = 30; x < 900; x += 25) {
+                for ( var y = 30; y < 570; y += 25) {
+                    let pix = img.get(x, y);
+                    if ( pix[0] > 200 ) {
+                        var temp = new Head(x, y, headSize*2, 80 + Math.random() * 20);
+                        heads.push(temp);
+                    } else if ( pix[0] > 128) {
+                        var temp = new Head(x, y, headSize, 60 + Math.random() * 40);
+                        heads.push(temp);
+                    }
+                }
+            }
         }
     };
 
-    p.mousePressed = function() {
-        var temp = new Head(p.mouseX, p.mouseY, 10 + Math.random()*10, 60 + Math.random() * 40);
-        heads.push(temp);
+    p.cycleImage = function(offset) {
+        imgIndex += offset;
+        if (imgIndex < 0) imgIndex = imgs.length -1;
+        if (imgIndex >= imgs.length) imgIndex = 0;
+        img = imgs[imgIndex];
+        p.image(imgs[imgIndex],0,0);
+        p.loadPixels();
+        p.background('#222');
+        var str = "image " + (imgIndex+1) + " of " + totalImages;
+        document.getElementById("innerOutput").innerHTML = str;
     }
+
+    var headSize = 5;
 
     function checkLife(head) {
         return head.life > 0;
@@ -75,27 +117,42 @@ let sketch = function(p) {
 
     p.draw = function() {
         with (p) {
-            //p.background(0,0,0,1);
             var newHeads = [];
 
             for ( var i = 0; i < heads.length; i++ ) {
 
                 var temp = heads[i];
 
-                // DO WE NEED A SPAWN?
-                if ( Math.random() < .02 && heads.length < 500 && temp.life > 10) {
-                    var spawn = new Head(temp.x, temp.y, 
-                                        temp.size * (temp.life / 100.0), 
-                                        temp.life); 
-                    newHeads.push(spawn);
-                }
-
+                // CONSTRAIN TO CANVAS
                 temp.x = temp.x < 0 ? 0 : temp.x;
                 temp.x = temp.x > 930 ? 930 : temp.x;
                 temp.y = temp.y < 0 ? 0 : temp.y;
                 temp.y = temp.y > 600 ? 600 : temp.y;
-                temp.life -= .25;
-                var size = temp.size * (temp.life / 100.0)
+
+                // GRAB BRIGHTNESS OF PIXEL
+                let pix = img.get(temp.x, temp.y)[0];                
+                //p.fill(pix);
+
+                p.fill(255,255,255,50);
+
+                temp.size = 1 + headSize * (pix/255);
+            
+                if ( pix < 25 ) {
+                    temp.life *= .98;
+                    temp.size *= .93;
+                }
+
+                // DO WE NEED A SPAWN?
+                if ( Math.random() < .2 && heads.length < 400 && temp.life > 10) {
+                    var spawn = new Head(temp.x, temp.y, 
+                                        temp.size, 
+                                        60 + Math.random()*40);
+                    newHeads.push(spawn);
+                }
+
+                temp.life -= .5;
+                var size = temp.size * (temp.life / 100.0);
+
                 ellipse(temp.x, temp.y, size, size);
                 temp.x += temp.dx;
                 temp.y += temp.dy;
@@ -123,9 +180,10 @@ let sketch = function(p) {
         p.line(0, 0, segLength, 0);
         p.pop();
     }
+
 };
 
-new p5(sketch, 'mainCanvas');
+var p5sketch = new p5(sketch, 'mainCanvas');
 
 </script>
 </body>

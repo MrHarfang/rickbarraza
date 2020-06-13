@@ -2,232 +2,132 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>Lines Sketch</title>
+        <title>Mycelial Growth (Study)</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
         <link href="./style.css?v=3" rel="stylesheet" type="text/css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/p5.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/addons/p5.dom.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.1/addons/p5.sound.min.js"></script>
+    
     </head>
     <body>
         <div id="container">
             <div id="canvasFrame">
-                <canvas id="mainCanvas"></canvas>
+                <div id="mainCanvas"></div>
                 <div id="canvasOutput">
-                    Press 'R' to reset the cloud torus. Drag the mouse to control the camera.
+                    Click on the screen to add new blooms
                 </div>
             </div>
             <div id="detailsFrame">
-                <div id="detailsTitle">100,000 LINES</div>
+                <div id="detailsTitle">Mycelial Growth (Study)</div>
                 <div id="detailsBlurb">
-                    Exploring BufferGeometry and Line Segments in THREE.JS. A basic custom shader is used
-                    to handle the transparency and additive blending of the lines. Each particle will randomly
-                    roam through the system, leaving a diminishing tail of 100 individual line segments behind
-                    to indicate their unique path. Simple easing keeps them close to their original spawn point.
+                    Using P5.JS to explore mycelial growth patterns. 
+                    The fungus hyphae bloom outward and split looking for food. 
+                    This is the algorithm study for what is used in the next project, "Mycelial Portaits"
                     
                 </div>
                 <button id="btnGithub" onclick="location.href='https://github.com/rickbarraza';"></button>
             </div>
             <div id="projectsFrame">
-                <input type="radio" onclick="window.location='/index.html';" />
-                <input type="radio" checked/>
-                <input type="radio" onclick="window.location='/sketch3.html';" />
+                <input type="radio" onclick="window.location='/index.html';" title="Gray-Scott Reactions"/>
+                <input type="radio" checked title="Study: Mycelial Growth"/>
+                <input type="radio" onclick="window.location='/sketch3.html';" title="Mycelial Portraits"/>
             </div>
             <div id="footerFrame">
                 RICKBARRAZA.COM
             </div>
         </div>
-<!-- WE NEED TO SETUP A CUSTOM SHADER SOLUTION SINCE WE WANT TO USE COLORS WITH TRANSPARENCY -->
-<script id="vertexShader" type="x-shader/x-vertex">
-    
-    attribute vec4 color;
-    varying vec4 vColor;
-    
-    void main()    {
-        vColor = color;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-    }
-    
-</script>    
-<script id="fragmentShader" type="x-shader/x-fragment">
-    
-    varying vec4 vColor;
-    
-    void main()    {
-        vec4 color = vec4( vColor );
-        gl_FragColor = color;
-    }
-    
-</script>
-<script type="module">
+<script>
 
-    import * as THREE from './libs/three.module.js';
-    import { OrbitControls } from './libs/OrbitControls.js';
+let sketch = function(p) {
 
-    var canvas;
-    var width = 930.0;
-    var height = 600.0;
-    var mRenderer, mScene, mCamera;
-    var geometry;
-    var line;
 
-    var vec = new THREE.Vector3();
-    var pos = new THREE.Vector3();
-    var mMouseX, mMouseY;
+    var heads = [];
 
-    var sparkles = [];
-
-    var totalSparkles = 1000;
-    var tailLength = 100;
-    var maxAlpha = .2;
-
-    class Sparkle {
-        constructor(pos) {
-            this.locations = [];
-            this.r = Math.random();
-            this.b = 1.0;
-            this.g = Math.random();
-            this.home = pos;
-            for ( var i = 0; i < tailLength; i++ ) {
-                this.locations.push(pos);
-            }
+    class Head {
+        constructor(_x, _y, _size, _life) {
+            this.x = _x;
+            this.y = _y;
+            this.dx = 3 * (Math.random() - Math.random());
+            this.dy = 3 * (Math.random() - Math.random());
+            this.size = _size;
+            this.life = _life;
         }
-
-        position() {
-            return this.locations[0];
+    }
+        
+    p.setup = function() {
+        for ( var i = 0; i < 3; i++ ) {
+            var temp = new Head(.5*930, .5*600, 10 + Math.random()*10, 60 + Math.random() * 40);
+            heads.push(temp);
         }
-
-        newPosition(pos) {
-            this.locations.unshift(pos);
-            this.locations.pop();
+        with (p) {
+            createCanvas(930, 600);
+            stroke(255, 100);
         }
     };
 
-    function initData() {
-
-        sparkles = [];
-        var radius = 50;
-        for ( var i = 0; i < totalSparkles; i++ ) {
-
-            var x = Math.cos(i*.5) * radius;
-            var y = 0;
-            var z = Math.sin(i*.5) * radius;
-
-            var temp = new Sparkle(new THREE.Vector3(x,y,z));
-            sparkles.push(temp);
-        }
+    p.mousePressed = function() {
+        var temp = new Head(p.mouseX, p.mouseY, 10 + Math.random()*10, 60 + Math.random() * 40);
+        heads.push(temp);
     }
 
-    function init() {
-
-        canvas = document.getElementById('mainCanvas');
-        canvas.onmousedown = onMouseDown;
-
-        mCamera = new THREE.PerspectiveCamera(35, width/height, 1, 4000 )
-        mCamera.position.z = 250;
-        mCamera.position.y = 150;
-        mScene = new THREE.Scene();
-
-        // SETUP GEOMETRY
-        geometry = new THREE.BufferGeometry();
-
-        var material = new THREE.ShaderMaterial({
-            vertexShader: document.getElementById('vertexShader').textContent,
-            fragmentShader: document.getElementById('fragmentShader').textContent,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthTest: false
-            });
-
-        initData();
-
-        updateData();
-
-        geometry.computeBoundingSphere();
-
-        // SET GEOMETRY AND MATERIAL TO LINE OBJECT
-        line = new THREE.LineSegments(geometry, material );
-        mScene.add( line );
-
-        // SETUP RENDERER LAST TO VISUALIZE ABOVE CHANGES
-        mRenderer = new THREE.WebGLRenderer({ canvas: canvas });
-        mRenderer.setPixelRatio(window.devicePixelRatio);
-        mRenderer.aspect = width/height;
-        mRenderer.setSize(width, height);
-        mRenderer.outputEncoding = THREE.sRGBEncoding;
-
-        var controls = new OrbitControls( mCamera, canvas );
-        document.addEventListener("keydown", onKeyDown, false);
-
-        render(0);
+    function checkLife(head) {
+        return head.life > 0;
     }
 
-    function onKeyDown(event) {
-        console.log("key: " + event.which);
-        switch ( event.which) {
-            case 82: // 'R' for Reset
-                initData();
-                break;
-        }
-    }
+    p.draw = function() {
+        with (p) {
+            //p.background(0,0,0,1);
+            var newHeads = [];
 
+            for ( var i = 0; i < heads.length; i++ ) {
 
-    var render = function(time) {
-        requestAnimationFrame(render);
+                var temp = heads[i];
 
-        updateData();
-        
-        // RENDER THE SCENE
-        mRenderer.render(mScene, mCamera);
-    }
+                // DO WE NEED A SPAWN?
+                if ( Math.random() < .02 && heads.length < 500 && temp.life > 10) {
+                    var spawn = new Head(temp.x, temp.y, 
+                                        temp.size * (temp.life / 100.0), 
+                                        temp.life); 
+                    newHeads.push(spawn);
+                }
 
-    function updateData() {
-        var positions = [];
-        var colors = [];
+                temp.x = temp.x < 0 ? 0 : temp.x;
+                temp.x = temp.x > 930 ? 930 : temp.x;
+                temp.y = temp.y < 0 ? 0 : temp.y;
+                temp.y = temp.y > 600 ? 600 : temp.y;
+                temp.life -= .25;
+                var size = temp.size * (temp.life / 100.0)
+                ellipse(temp.x, temp.y, size, size);
+                temp.x += temp.dx;
+                temp.y += temp.dy;
+                temp.dx += .5*(random() - random());
+                temp.dy += .5*(random() - random());
+                temp.dx *= .98;
+                temp.dy *= .98;
+            }
 
-        for ( var i = 0; i < sparkles.length; i++) {
-            var temp = sparkles[i];
-            var pos = temp.position();
-            var home = temp.home;
-
-            var cx = pos.x + Math.random()*2 - 1;
-            var cy = pos.y + Math.random()*2 - 1;
-            var cz = pos.z + Math.random()*2 - 1;
-
-            cx += (home.x - cx) * .02;
-            cy += (home.y - cy) * .02;
-            cz += (home.z - cz) * .02;
-
-            temp.newPosition(new THREE.Vector3(cx, cy, cz));
-            for ( var p = 0; p < temp.locations.length - 1; p++) {
-                // DRAW THE TAILS
-                var alpha = maxAlpha*(1.0 - (p/temp.locations.length));
-                positions.push(temp.locations[p].x, temp.locations[p].y, temp.locations[p].z );
-                colors.push(temp.r, temp.g, temp.b, alpha);
-                positions.push(temp.locations[p+1].x, temp.locations[p+1].y, temp.locations[p+1].z );
-                colors.push(temp.r, temp.g, temp.b, alpha);
+            heads = heads.filter(checkLife);
+            for ( var i =0; i < newHeads.length; i++ ) {
+                heads.push(newHeads[i]);
+            }
+            newHeads = [];
+            if ( heads.length > 0 ) {
+                console.log(heads.length);
             }
         }
+    };
 
-        // SET POSITION AND COLOR TO GEOMETRY
-        geometry.setAttribute( 'position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute( colors, 4));
+    function segment(x, y, a) {
+        p.push();
+        p.translate(x, y);
+        p.rotate(a);
+        p.line(0, 0, segLength, 0);
+        p.pop();
     }
+};
 
-    function onMouseDown(e) {
-        var ev = e ? e : window.event;
-        mMouseX = ev.pageX - canvas.offsetLeft;
-        mMouseY = ev.pageY - canvas.offsetTop;
-        // CALCULATE POSITION AT Z = 0
-        vec.set(
-            (mMouseX/width) * 2 - 1,
-            -(mMouseY/height) * 2 + 1,
-            0.5 );
-        vec.unproject( mCamera );
-        vec.sub( mCamera.position ).normalize();
-        var distance = - mCamera.position.z / vec.z;
-        pos.copy( mCamera.position ).add( vec.multiplyScalar( distance ) );
-        console.log(pos.x + ", " + pos.y + ", " + pos.z);
-    }
-
-    init();
+new p5(sketch, 'mainCanvas');
 
 </script>
 </body>
