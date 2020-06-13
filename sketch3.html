@@ -27,6 +27,7 @@
                     represent the soil and simulate fungal networks blooming. The fungal hyphae feed
                     on the brightest spots of image which also stimulate growth. Dark patches weaken
                     the growth. Over time, the source image becomes visible in the growth network. 
+                    Growth patterns are random so each fungal network image will grow differently each time.  
                     Made with P5.JS
                     
                 </div>
@@ -96,6 +97,11 @@ let sketch = function(p) {
             }
         }
     };
+
+    p.mousePressed = function() {
+        var temp = new Head(p.mouseX, p.mouseY, 6 + Math.random()*6, 60 + Math.random() * 40);
+        heads.push(temp);
+    }
 
     p.cycleImage = function(offset) {
         imgIndex += offset;
