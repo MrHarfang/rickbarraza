@@ -15,7 +15,7 @@
 
 		<script type="module">
 
-			import * as THREE from '/three.module.js';
+			import * as THREE from './three.module.js';
 
 			var camera, scene, renderer, materials = [], parameters;
 			var mouseX = 0, mouseY = 0;
@@ -39,12 +39,12 @@
 
 				var textureLoader = new THREE.TextureLoader();
 
-				var sprite1 = textureLoader.load( '/sprites/snowflake1.png' );
-				var sprite2 = textureLoader.load( '/sprites/snowflake2.png' );
-				var sprite3 = textureLoader.load( '/sprites/snowflake3.png' );
-				var sprite4 = textureLoader.load( '/sprites/snowflake4.png' );
-				var sprite5 = textureLoader.load( '/sprites/snowflake5.png' );
-
+				var sprite1 = textureLoader.load( './sprites/snowflake1.png' );
+				var sprite2 = textureLoader.load( './sprites/snowflake2.png' );
+				var sprite3 = textureLoader.load( './sprites/snowflake3.png' );
+				var sprite4 = textureLoader.load( './sprites/snowflake4.png' );
+				var sprite5 = textureLoader.load( './sprites/snowflake5.png' );
+				
 				for ( var i = 0; i < 10000; i ++ ) {
 
 					var x = Math.random() * 2000 - 1000;
