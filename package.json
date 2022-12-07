@@ -1,0 +1,28 @@
+{
+  "name": "rickbarraza",
+  "version": "1.0.0",
+  "description": "Personal website of Rick Barraza",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrHarfang/rickbarraza.git"
+  },
+  "keywords": [
+    "creative",
+    "coding",
+    "ml",
+    "design",
+    "graphics",
+    "ai",
+    "simulations"
+  ],
+  "author": "Rick Barraza",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MrHarfang/rickbarraza/issues"
+  },
+  "homepage": "https://github.com/MrHarfang/rickbarraza#readme"
+}
