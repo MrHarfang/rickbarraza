@@ -1,7 +1,7 @@
 {
   "name": "rickbarraza",
   "version": "1.0.0",
-  "description": "Personal website of Rick Barraza",
+  "description": "old personal website of Rick Barraza",
   "main": "index.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -22,10 +22,10 @@
   ],
   "author": "Rick Barraza",
   "license": "ISC",
+  "homepage":"https://Mrharfang.github.io/rickbarraza",
   "bugs": {
     "url": "https://github.com/MrHarfang/rickbarraza/issues"
   },
-  "homepage": "https://github.com/MrHarfang/rickbarraza#readme",
   "devDependencies": {
     "gh-pages": "^4.0.0"
   }
