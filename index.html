@@ -213,12 +213,12 @@
             kill: { type: "f", value: undefined},
             cursor: {type: "v2", value: new THREE.Vector2(.5, .5)},
             isAdding: { type: "f", value: 1.0 },
-            color1: { type: "v4", value: new THREE.Vector4(0x4C/255.0,  0x05/255.0,  0x05/255.0,  0.0245)},
-            color2: { type: "v4", value: new THREE.Vector4(0xAC/255.0,  0x00/255.0,  0xDD/255.0,  0.098)},
-            color3: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0xFF/255.0,  0x00/255.0,  0.2147)},
-            color4: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0xCC/255.0,  0xCC/255.0,  0.3067)},
-            color5: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0x00/255.0,  0xCC/255.0,  0.4172)},
-            color6: { type: "v4", value: new THREE.Vector4(0x00/255.0,  0x00/255.0,  0x44/255.0,  1.0)},
+            color1: { type: "v4", value: new THREE.Vector4(0x22/255.0,  0x33/255.0,  0x33/255.0,  0.0245)},
+            color2: { type: "v4", value: new THREE.Vector4(0x6D/255.0,  0xDF/255.0,  0xCC/255.0,  0.098)},
+            color3: { type: "v4", value: new THREE.Vector4(0xFF/255.0,  0x09/255.0,  0x90/255.0,  0.2147)},
+            color4: { type: "v4", value: new THREE.Vector4(0xfd/255.0,  0x66/255.0,  0x66/255.0,  0.3067)},
+            color5: { type: "v4", value: new THREE.Vector4(0x72/255.0,  0x00/255.0,  0x00/255.0,  0.4172)},
+            color6: { type: "v4", value: new THREE.Vector4(0xff/255.0,  0xff/255.0,  0x00/255.0,  0.9)},
 
         };
 
@@ -317,7 +317,7 @@
 
         mScreenQuad.material = mScreenMaterial;
         mRenderer.render(mScene, mCamera);
-        
+
         // DO IT AGAIN
         requestAnimationFrame(render);
     }
@@ -349,6 +349,30 @@
 
     init();
 
+    var firstSpawns = 0;
+    var initialDX = 0.5;
+    var initialDY = 0.5;
+
+    function initialSpawns() {
+
+        //if ( initialDX <= 0) initialDX = Math.random();
+        //if ( initialDY <= 0) initialDY = Math.random();
+
+        initialDX += (Math.random() * .01);
+        initialDY += (Math.random() * .05);
+
+        mUniforms.isAdding.value = 1;
+        mUniforms.cursor.value = new THREE.Vector2(initialDX, 1 - initialDY);
+
+        firstSpawns++;
+        if (firstSpawns > 6) {
+            clearInterval(initialSpawns);
+            mUniforms.cursor.value = new THREE.Vector2(-1,-1);
+        }
+    }
+
+    setInterval(initialSpawns, 10);
+    
 </script>
 </body>
 </html>

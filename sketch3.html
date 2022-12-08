@@ -78,10 +78,6 @@ let sketch = function(p) {
             createCanvas(930, 600);
             cycleImage(0);
             noStroke();
-            //let d = pixelDensity(); // returns 2 on the mac
-            //console.log("density: " + d);
-            //console.log(pixels.length);
-            //console.log(4 * (930 * 2 * 600 * 2));
 
             for ( var x = 30; x < 900; x += 25) {
                 for ( var y = 30; y < 570; y += 25) {
@@ -173,9 +169,6 @@ let sketch = function(p) {
                 heads.push(newHeads[i]);
             }
             newHeads = [];
-            if ( heads.length > 0 ) {
-                console.log(heads.length);
-            }
         }
     };
 
